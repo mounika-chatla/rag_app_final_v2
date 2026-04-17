@@ -11,7 +11,7 @@ from groq import Groq
 # =========================
 # GROQ LLM (FIXED)
 # =========================
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+client = Groq(api_key=st.secrets["mounika123"])
 
 def ask_llm(context, question):
     response = client.chat.completions.create(
