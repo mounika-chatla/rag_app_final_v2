@@ -9,9 +9,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from groq import Groq
 
 # =========================
-# GROQ LLM (SAFE SECRETS)
+# GROQ LLM (FIXED)
 # =========================
-client = Groq(api_key=st.secrets["gsk_...anXF"])
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 def ask_llm(context, question):
     response = client.chat.completions.create(
@@ -91,7 +91,7 @@ def create_db():
     return index, chunks
 
 # =========================
-# PROCESS BUTTON
+# PROCESS PDFs
 # =========================
 if st.button("Process PDFs"):
     with st.spinner("Creating Vector DB..."):
@@ -125,10 +125,8 @@ if st.button("Get Answer"):
         docs = [st.session_state.chunks[i] for i in I[0]]
         context = "\n\n".join([d.page_content for d in docs])
 
-        # Aggregated
         if any(x in query.lower() for x in ["count", "how many", "total"]):
             answer = f"Total documents used: {len(set([d.metadata['source'] for d in docs]))}"
-
         else:
             answer = ask_llm(context[:2000], query)
 
