@@ -9,7 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from transformers import pipeline
 
 # ✅ Load lightweight LLM
-generator = pipeline("text2text-generation", model="google/flan-t5-small")
+generator = pipeline("text-generation", model="gpt2")
 
 # UI
 st.set_page_config(page_title="AI RAG App", layout="wide")
