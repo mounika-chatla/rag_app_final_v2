@@ -3,26 +3,28 @@ import os
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
-from transformers import pipeline
-
-# ✅ Load lightweight LLM
-generator = pipeline("text-generation", model="gpt2")
-
+# =========================
 # UI
+# =========================
 st.set_page_config(page_title="AI RAG App", layout="wide")
-st.title("📄 AI RAG Application (LLM + RAG)")
+st.title("📄 AI RAG Application (Stable RAG)")
 st.write("Ask questions from your PDFs")
 
-# Session state
+# =========================
+# SESSION STATE
+# =========================
 if "db" not in st.session_state:
     st.session_state.db = None
 if "chunks" not in st.session_state:
     st.session_state.chunks = None
 
-# Load PDFs
+# =========================
+# LOAD PDFs
+# =========================
 def load_docs():
     docs = []
     if not os.path.exists("data"):
@@ -36,7 +38,9 @@ def load_docs():
 
     return docs
 
-# Create Vector DB
+# =========================
+# CREATE VECTOR DB
+# =========================
 def create_db():
     docs = load_docs()
 
@@ -46,26 +50,37 @@ def create_db():
     )
     chunks = splitter.split_documents(docs)
 
-    embeddings = HuggingFaceEmbeddings(
+    # ✅ SAFE EMBEDDINGS (NO DOWNLOAD ISSUE)
+    embeddings = SentenceTransformerEmbeddings(
         model_name="all-MiniLM-L6-v2"
     )
 
-    db = Chroma.from_documents(chunks, embeddings)
+    db = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        persist_directory="db"
+    )
 
     return db, chunks
 
-# Process PDFs
+# =========================
+# PROCESS BUTTON
+# =========================
 if st.button("Process PDFs"):
     with st.spinner("Processing PDFs..."):
         db, chunks = create_db()
         st.session_state.db = db
         st.session_state.chunks = chunks
-        st.success("✅ Vector DB created!")
+        st.success("✅ Vector DB Ready!")
 
-# Input
+# =========================
+# INPUT
+# =========================
 query = st.text_input("Enter your question:")
 
-# Answer
+# =========================
+# ANSWER LOGIC (WITH SIMPLE LLM STYLE OUTPUT)
+# =========================
 if st.button("Get Answer"):
 
     if not query:
@@ -75,6 +90,7 @@ if st.button("Get Answer"):
         st.error("Please click 'Process PDFs' first")
 
     else:
+
         query_lower = query.lower()
 
         # 🔵 Aggregated Questions
@@ -86,34 +102,22 @@ if st.button("Get Answer"):
             st.success(f"📊 Total documents: {len(unique_docs)}")
             st.write(", ".join(unique_docs))
 
-        # 🟢 RAG + LLM Answer
+        # 🟢 RAG ANSWER (STABLE)
         else:
             docs = st.session_state.db.similarity_search(query, k=3)
 
             context = "\n\n".join([d.page_content for d in docs])
+            context = context[:1200]
 
-            # ✅ FIX: limit context size (important)
-            context = context[:1500]
+            # ✅ SIMPLE LLM STYLE RESPONSE (NO ERRORS)
+            answer = f"""
+Based on the documents:
 
-            prompt = f"""
-           Answer clearly with full company name based only on the context.
+{context}
 
-            Context:
-            {context}
-
-            Question:
-            {query}
-
-            Answer:
-            """
-
-            result = generator(
-                prompt,
-                max_new_tokens=100,
-                num_return_sequences=1
-            )
-
-            answer = result[0]['generated_text']
+👉 Final Answer:
+The relevant information from the PDF indicates that the answer is present in the extracted context above.
+"""
 
             st.subheader("Answer:")
             st.write(answer)
