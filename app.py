@@ -11,11 +11,11 @@ from groq import Groq
 # =========================
 # GROQ LLM (FIXED)
 # =========================
-client = Groq(api_key=st.secrets["mounika123"])
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 def ask_llm(context, question):
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.1-8b-instant",
         messages=[
             {
                 "role": "system",
@@ -23,15 +23,7 @@ def ask_llm(context, question):
             },
             {
                 "role": "user",
-                "content": f"""
-Context:
-{context}
-
-Question:
-{question}
-
-Answer clearly and short:
-"""
+                "content": f"Context:\n{context}\n\nQuestion:\n{question}"
             }
         ]
     )
