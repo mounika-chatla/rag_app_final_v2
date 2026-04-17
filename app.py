@@ -8,19 +8,23 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from groq import Groq
 
-# =========================
-# GROQ LLM (FIXED)
-# =========================
+# -------------------------
+# SAFE SECRET CHECK
+# -------------------------
+if "GROQ_API_KEY" not in st.secrets:
+    st.error("❌ GROQ_API_KEY not found in Streamlit Secrets")
+    st.stop()
+
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
+# -------------------------
+# LLM FUNCTION
+# -------------------------
 def ask_llm(context, question):
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
-            {
-                "role": "system",
-                "content": "Answer only from the given context."
-            },
+            {"role": "system", "content": "Answer only from context."},
             {
                 "role": "user",
                 "content": f"Context:\n{context}\n\nQuestion:\n{question}"
@@ -29,41 +33,37 @@ def ask_llm(context, question):
     )
     return response.choices[0].message.content
 
-# =========================
+# -------------------------
 # UI
-# =========================
-st.set_page_config(page_title="RAG + LLM App", layout="wide")
-st.title("📄 AI RAG Application (FAISS + GROQ LLM)")
-st.write("Ask questions from your PDFs")
+# -------------------------
+st.set_page_config(page_title="RAG App", layout="wide")
+st.title("📄 AI RAG Application")
 
-# =========================
+# -------------------------
 # STATE
-# =========================
+# -------------------------
 if "index" not in st.session_state:
     st.session_state.index = None
+
 if "chunks" not in st.session_state:
     st.session_state.chunks = None
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-# =========================
-# LOAD PDFS
-# =========================
+# -------------------------
+# LOAD DOCS
+# -------------------------
 def load_docs():
     docs = []
-    if not os.path.exists("data"):
-        return docs
-
     for file in os.listdir("data"):
         if file.endswith(".pdf"):
             loader = PyPDFLoader(os.path.join("data", file))
             docs.extend(loader.load())
-
     return docs
 
-# =========================
-# CREATE VECTOR DB
-# =========================
+# -------------------------
+# VECTOR DB
+# -------------------------
 def create_db():
     docs = load_docs()
 
@@ -82,45 +82,29 @@ def create_db():
 
     return index, chunks
 
-# =========================
-# PROCESS PDFs
-# =========================
+# -------------------------
+# PROCESS
+# -------------------------
 if st.button("Process PDFs"):
-    with st.spinner("Creating Vector DB..."):
-        index, chunks = create_db()
-        st.session_state.index = index
-        st.session_state.chunks = chunks
-        st.success("✅ Vector DB Ready")
+    index, chunks = create_db()
+    st.session_state.index = index
+    st.session_state.chunks = chunks
+    st.success("✅ Ready")
 
-# =========================
+# -------------------------
 # QUERY
-# =========================
-query = st.text_input("Enter your question:")
+# -------------------------
+query = st.text_input("Ask question")
 
 if st.button("Get Answer"):
 
-    if not query:
-        st.warning("Enter question")
+    q_emb = model.encode([query])
 
-    elif st.session_state.index is None:
-        st.error("Click Process PDFs first")
+    D, I = st.session_state.index.search(np.array(q_emb), k=3)
 
-    else:
+    docs = [st.session_state.chunks[i] for i in I[0]]
+    context = "\n\n".join([d.page_content for d in docs])
 
-        q_emb = model.encode([query])
+    answer = ask_llm(context[:2000], query)
 
-        D, I = st.session_state.index.search(
-            np.array(q_emb),
-            k=3
-        )
-
-        docs = [st.session_state.chunks[i] for i in I[0]]
-        context = "\n\n".join([d.page_content for d in docs])
-
-        if any(x in query.lower() for x in ["count", "how many", "total"]):
-            answer = f"Total documents used: {len(set([d.metadata['source'] for d in docs]))}"
-        else:
-            answer = ask_llm(context[:2000], query)
-
-        st.subheader("Answer:")
-        st.success(answer)
+    st.success(answer)
